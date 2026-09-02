@@ -1,5 +1,13 @@
 # PermissionDiff
 
+> **Prove your code didn't just hand the wrong person the keys.**
+
+[![CI](https://github.com/abishekgiri/permissiondiff/actions/workflows/ci.yml/badge.svg)](https://github.com/abishekgiri/permissiondiff/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-green)
+[![Ruff](https://img.shields.io/badge/lint-ruff-000000)](https://github.com/astral-sh/ruff)
+![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue)
+
 **PermissionDiff is a CI-native tool that shows exactly how a code change alters effective authorization.** It answers: “Did this pull request accidentally give a user, tenant, role, or service access it did not have before?”
 
 PermissionDiff generates meaningful authorization cases from subjects, resources, actions, and context values you declare. It checks explicit invariants and records baseline cases so a candidate authorizer evaluates the **same exact corpus**. Security verdicts are deterministic Python decisions—never LLM judgments.
@@ -155,7 +163,7 @@ Exit codes are stable: `0` pass, `1` configured policy/invariant failure, `2` co
 Once published, the repository's thin composite action can invoke the same CLI without duplicating its logic:
 
 ```yaml
-- uses: permissiondiff/permissiondiff@v0
+- uses: abishekgiri/permissiondiff@v0
   with:
     config: permissiondiff.yaml
     baseline: .permissiondiff/main.json
