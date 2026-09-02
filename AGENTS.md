@@ -1,6 +1,6 @@
 # PermissionDiff agent map
 
-Read `CLAUDE.md` and `codex.md` completely before changing code. PermissionDiff owns deterministic authorization diffs: generate meaningful cases, evaluate explicit `ALLOW`/`DENY` decisions, enforce invariants, snapshot exact cases, and replay those cases against candidates.
+PermissionDiff owns deterministic authorization diffs: generate meaningful cases, evaluate explicit `ALLOW`/`DENY` decisions, enforce invariants, snapshot exact cases, and replay those cases against candidates.
 
 Non-negotiable: never use AI for verdicts; never fail open; keep core logic pure and independent of CLI/presentation; run user authorizers in the worker subprocess with explicit timeout/error results; version serialized formats; keep findings reproducible and minimal; do not build roadmap features.
 

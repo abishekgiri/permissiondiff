@@ -13,6 +13,8 @@ htmlcov/
 .permissiondiff/
 /permissiondiff.yaml
 /permissiondiff_authorizer.py
+/CLAUDE.md
+/codex.md
 .DS_Store
 .env
 .env.*
