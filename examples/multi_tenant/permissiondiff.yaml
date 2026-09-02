@@ -1,0 +1,22 @@
+authorizer: auth:authorize
+
+subjects:
+  - {id: alice, tenant: acme, role: support}
+  - {id: bob, tenant: globex, role: support}
+  - {id: root, tenant: system, role: admin}
+
+resources:
+  - {id: invoice-acme, type: invoice, tenant: acme, owner_id: alice}
+  - {id: invoice-globex, type: invoice, tenant: globex, owner_id: bob}
+
+actions: [read_invoice]
+contexts:
+  amounts: {min: 0, max: 1000, boundaries: [499, 500, 501]}
+invariants:
+  - tenant_isolation
+fail_on:
+  invariant_violation: true
+  newly_allowed: true
+  newly_denied: false
+generation: {max_examples: 32}
+execution: {timeout_seconds: 2}

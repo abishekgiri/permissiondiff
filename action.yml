@@ -1,0 +1,34 @@
+name: PermissionDiff
+description: Replay an exact authorization baseline against a pull request
+
+inputs:
+  config:
+    description: Path to permissiondiff.yaml in the calling repository
+    required: false
+    default: permissiondiff.yaml
+  baseline:
+    description: Path to the committed baseline snapshot
+    required: true
+  python-version:
+    description: Python version used for the authorization corpus
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install PermissionDiff
+      shell: bash
+      run: uv sync --project "$GITHUB_ACTION_PATH" --no-dev
+    - name: Replay authorization baseline
+      shell: bash
+      env:
+        PERMISSIONDIFF_CONFIG: ${{ inputs.config }}
+        PERMISSIONDIFF_BASELINE: ${{ inputs.baseline }}
+      run: >-
+        uv run --project "$GITHUB_ACTION_PATH" permissiondiff diff
+        --config "$PERMISSIONDIFF_CONFIG"
+        --baseline "$PERMISSIONDIFF_BASELINE"

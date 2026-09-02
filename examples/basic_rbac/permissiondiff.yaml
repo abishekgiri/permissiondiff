@@ -1,0 +1,17 @@
+authorizer: auth:authorize
+
+subjects:
+  - {id: alice, tenant: acme, role: support}
+  - {id: admin-acme, tenant: acme, role: admin}
+  - {id: bob, tenant: globex, role: support}
+
+resources:
+  - {id: invoice-acme, type: invoice, tenant: acme, owner_id: alice}
+  - {id: invoice-globex, type: invoice, tenant: globex, owner_id: bob}
+
+actions: [read_invoice, delete_account]
+invariants:
+  - tenant_isolation
+  - role_boundary: {action: delete_account, allowed_roles: [admin]}
+generation: {max_examples: 32}
+execution: {timeout_seconds: 2}
