@@ -1,5 +1,10 @@
 name: PermissionDiff
 description: Replay an exact authorization baseline against a pull request
+author: Abishek Giri
+
+branding:
+  icon: shield
+  color: purple
 
 inputs:
   config:
@@ -29,6 +34,6 @@ runs:
         PERMISSIONDIFF_CONFIG: ${{ inputs.config }}
         PERMISSIONDIFF_BASELINE: ${{ inputs.baseline }}
       run: >-
-        uv run --project "$GITHUB_ACTION_PATH" permissiondiff diff
+        uv run --project "$GITHUB_ACTION_PATH" --no-sync permissiondiff diff
         --config "$PERMISSIONDIFF_CONFIG"
         --baseline "$PERMISSIONDIFF_BASELINE"

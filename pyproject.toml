@@ -4,14 +4,28 @@ version = "0.1.0"
 description = "Deterministic differential authorization regression testing"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "Apache-2.0" }
-authors = [{ name = "PermissionDiff contributors" }]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Abishek Giri" }]
+keywords = [
+    "authorization",
+    "ci",
+    "differential-testing",
+    "property-based-testing",
+    "security-testing",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
     "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
 ]
 dependencies = [
     "hypothesis>=6.100",
@@ -20,6 +34,13 @@ dependencies = [
     "rich>=13.7",
     "typer>=0.12",
 ]
+
+[project.urls]
+Homepage = "https://github.com/abishekgiri/permissiondiff"
+Repository = "https://github.com/abishekgiri/permissiondiff"
+Issues = "https://github.com/abishekgiri/permissiondiff/issues"
+Changelog = "https://github.com/abishekgiri/permissiondiff/blob/main/CHANGELOG.md"
+Security = "https://github.com/abishekgiri/permissiondiff/security/policy"
 
 [project.scripts]
 permissiondiff = "permissiondiff.cli:app"

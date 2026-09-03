@@ -3,7 +3,7 @@
 > **Prove your code didn't just hand the wrong person the keys.**
 
 [![CI](https://github.com/abishekgiri/permissiondiff/actions/workflows/ci.yml/badge.svg)](https://github.com/abishekgiri/permissiondiff/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![Python](https://img.shields.io/badge/python-3.12%E2%80%933.14-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 [![Ruff](https://img.shields.io/badge/lint-ruff-000000)](https://github.com/astral-sh/ruff)
 ![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue)
@@ -12,24 +12,44 @@
 
 PermissionDiff generates meaningful authorization cases from subjects, resources, actions, and context values you declare. It checks explicit invariants and records baseline cases so a candidate authorizer evaluates the **same exact corpus**. Security verdicts are deterministic Python decisions—never LLM judgments.
 
-## Five-minute quickstart
+```text
+CRITICAL — Cross-tenant access must be denied
+support(acme) → read_invoice → invoice(globex)
+actual: ALLOW
+repro: .permissiondiff/failures/PD-0001.json
+```
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+PermissionDiff is at **v0/alpha** maturity. The core workflow is tested and usable, but public
+interfaces may evolve before 1.0. It supports Python 3.12, 3.13, and 3.14 and is licensed under
+[Apache-2.0](https://github.com/abishekgiri/permissiondiff/blob/main/LICENSE).
+
+## Install
+
+Install the CLI with uv:
 
 ```bash
-uv sync --all-groups
-uv run permissiondiff init demo
+uv tool install permissiondiff
+```
+
+Or install it in an active virtual environment with pip:
+
+```bash
+python -m pip install permissiondiff
+```
+
+To add PermissionDiff to an existing uv project instead, run `uv add permissiondiff`.
+
+## Five-minute quickstart
+
+After installation:
+
+```bash
+permissiondiff init demo
 cd demo
-uv run permissiondiff test
+permissiondiff test
 ```
 
 `init` creates a runnable config and a deliberately vulnerable authorizer. The test reports a minimized cross-tenant reproduction under `.permissiondiff/failures/` and exits `1` because the tenant-isolation invariant fails.
-
-Install into another uv project with:
-
-```bash
-uv add permissiondiff
-```
 
 ## Authorizer interface
 
@@ -132,15 +152,6 @@ Classification is exhaustive:
 
 A newly allowed path is security-sensitive, not automatically a vulnerability. `fail_on` decides what blocks CI. Invariants can still catch a vulnerability already present in the baseline.
 
-Example failure:
-
-```text
-CRITICAL — Cross-tenant access must be denied
-support(acme) → read_invoice → invoice(globex)
-actual: ALLOW
-repro: .permissiondiff/failures/PD-0001.json
-```
-
 The complete machine report is `.permissiondiff/report.json` by default.
 
 ## CI
@@ -160,7 +171,7 @@ jobs:
 
 Exit codes are stable: `0` pass, `1` configured policy/invariant failure, `2` configuration or snapshot error, `3` evaluation/runtime error.
 
-Once published, the repository's thin composite action can invoke the same CLI without duplicating its logic:
+The repository's thin composite action invokes the same CLI without duplicating its logic:
 
 ```yaml
 - uses: abishekgiri/permissiondiff@v0
@@ -177,6 +188,10 @@ Authorizers run in a timeout-controlled subprocess to isolate crashes and hangs 
 
 Snapshots and reproductions may contain sensitive identifiers. Treat them accordingly. v0 supports local Python authorizers and explicit domains; it does not include Git worktree orchestration, remote policy engines, live agent/tool interception, a dashboard, or least-privilege mining.
 
+Report vulnerabilities privately as described in the
+[security policy](https://github.com/abishekgiri/permissiondiff/security/policy). For bugs and
+feature requests, use [GitHub Issues](https://github.com/abishekgiri/permissiondiff/issues).
+
 ## Development
 
 ```bash
@@ -190,3 +205,8 @@ uv build
 ```
 
 The roadmap is deliberately short: prove authorization diffs are useful, then consider policy-engine adapters, Git-aware orchestration, agent principals/delegation, safe shadow interception, and least-privilege reduction with proof.
+
+See the [contribution guide](https://github.com/abishekgiri/permissiondiff/blob/main/CONTRIBUTING.md)
+for the contribution workflow and the
+[changelog](https://github.com/abishekgiri/permissiondiff/blob/main/CHANGELOG.md) for release
+history.
