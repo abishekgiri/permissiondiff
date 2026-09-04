@@ -3,6 +3,7 @@
 > **Prove your code didn't just hand the wrong person the keys.**
 
 [![CI](https://github.com/abishekgiri/permissiondiff/actions/workflows/ci.yml/badge.svg)](https://github.com/abishekgiri/permissiondiff/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/permissiondiff)](https://pypi.org/project/permissiondiff/)
 ![Python](https://img.shields.io/badge/python-3.12%E2%80%933.14-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 [![Ruff](https://img.shields.io/badge/lint-ruff-000000)](https://github.com/astral-sh/ruff)
@@ -25,7 +26,14 @@ interfaces may evolve before 1.0. It supports Python 3.12, 3.13, and 3.14 and is
 
 ## Install
 
-Install the CLI with uv:
+Add the [published package](https://pypi.org/project/permissiondiff/) to an existing uv project:
+
+```bash
+uv add permissiondiff
+uv run permissiondiff --help
+```
+
+For a standalone CLI, install it with uv:
 
 ```bash
 uv tool install permissiondiff
@@ -37,11 +45,9 @@ Or install it in an active virtual environment with pip:
 python -m pip install permissiondiff
 ```
 
-To add PermissionDiff to an existing uv project instead, run `uv add permissiondiff`.
-
 ## Five-minute quickstart
 
-After installation:
+After standalone CLI installation (or use `uv run permissiondiff` inside a uv project):
 
 ```bash
 permissiondiff init demo
@@ -179,6 +185,11 @@ The repository's thin composite action invokes the same CLI without duplicating 
     config: permissiondiff.yaml
     baseline: .permissiondiff/main.json
 ```
+
+Check out the calling repository before this step and make sure the baseline is present in CI.
+Use `@v0.1.0` to pin this release; `@v0` follows compatible v0 releases. The
+[published-consumer smoke test](https://github.com/abishekgiri/permissiondiff/blob/main/.github/workflows/published-smoke.yml)
+exercises the PyPI package and the remote action in a fresh workspace without a source checkout.
 
 ## Security and limitations
 
