@@ -1,0 +1,85 @@
+name: Published consumer smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - README.md
+      - .github/workflows/published-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Intentionally no checkout: consume the released package and remote action only.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install from PyPI in an empty consumer project
+        run: |
+          uv init --bare --vcs none --name permissiondiff-consumer --python 3.12
+          uv add permissiondiff==0.1.0
+          uv run python -c 'import importlib.metadata as m; assert m.version("permissiondiff") == "0.1.0"; assert m.distribution("permissiondiff").read_text("direct_url.json") is None'
+          uv run permissiondiff --help
+          uv run python -m permissiondiff --help
+          uv run permissiondiff init
+      - name: Verify the vulnerable demo and explain its finding
+        run: |
+          set +e
+          uv run permissiondiff test --seed 42
+          test_exit=$?
+          set -e
+          test "$test_exit" -eq 1
+          jq -e 'any(.findings[]; .invariant == "tenant_isolation")' .permissiondiff/report.json
+          uv run permissiondiff explain PD-0001
+      - name: Create a deny-all baseline using the installed package
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          config = yaml.safe_load(Path("permissiondiff.yaml").read_text())
+          config["authorizer"] = "safe_authorizer:authorize"
+          Path("baseline.yaml").write_text(yaml.safe_dump(config))
+          Path("safe_authorizer.py").write_text(
+              "from permissiondiff import Decision\n"
+              "def authorize(subject, action, resource, context):\n"
+              "    return Decision.DENY\n"
+          )
+          PY
+          uv run permissiondiff test --config baseline.yaml --seed 42
+          uv run permissiondiff snapshot --config baseline.yaml --output baseline.json --seed 42
+      - name: Verify the installed CLI detects DENY to ALLOW
+        run: |
+          set +e
+          uv run permissiondiff diff --baseline baseline.json --json-output cli-report.json --failures-dir cli-failures
+          diff_exit=$?
+          set -e
+          test "$diff_exit" -eq 1
+          jq -e 'any(.findings[]; .change == "newly_allowed" and .baseline == "DENY" and .candidate == "ALLOW")' cli-report.json
+          uv run permissiondiff explain PD-0001 --failures-dir cli-failures
+      - name: Verify the remote action passes the safe baseline
+        uses: abishekgiri/permissiondiff@v0
+        with:
+          config: baseline.yaml
+          baseline: baseline.json
+      - name: Verify the remote action rejects the vulnerable candidate
+        id: vulnerable
+        continue-on-error: true
+        uses: abishekgiri/permissiondiff@v0
+        with:
+          config: permissiondiff.yaml
+          baseline: baseline.json
+      - name: Require an actual authorization finding, not an installation error
+        if: always()
+        env:
+          ACTION_OUTCOME: ${{ steps.vulnerable.outcome }}
+        run: |
+          test "$ACTION_OUTCOME" = failure
+          jq -e 'any(.findings[]; .change == "newly_allowed" and .baseline == "DENY" and .candidate == "ALLOW")' .permissiondiff/report.json
+          jq -e 'all(.findings[]; .error == null)' .permissiondiff/report.json
+          jq -e --slurpfile snapshot baseline.json '.cases_evaluated == ($snapshot[0].cases | length)' .permissiondiff/report.json
