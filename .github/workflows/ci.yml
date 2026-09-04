@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --all-groups
-      - run: uv run pytest --cov=permissiondiff --cov-report=term-missing
+      - run: uv run pytest --cov=permissiondiff --cov-report=term-missing --cov-fail-under=85
 
   dependency-review:
     name: Dependency review

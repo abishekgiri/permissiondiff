@@ -221,6 +221,36 @@ def test_newly_denied_is_visible_but_does_not_fail_by_default(tmp_path: Path) ->
     assert any(item["change"] == "newly_denied" for item in report["findings"])
 
 
+def test_baseline_that_already_violates_an_invariant_is_still_caught(tmp_path: Path) -> None:
+    """Invariants catch a pre-existing bug that differential testing alone cannot."""
+    spec = write_authorizer(tmp_path, VULNERABLE_AUTHORIZER, "already_vulnerable")
+    config_path = write_config(tmp_path, spec)  # invariants default to tenant_isolation
+    snapshot_path = tmp_path / "vulnerable_baseline.json"
+    snapshot_result = RUNNER.invoke(
+        app,
+        ["snapshot", "-c", str(config_path), "-o", str(snapshot_path), "--max-examples", "8"],
+    )
+    assert snapshot_result.exit_code == 0, snapshot_result.output
+
+    # Replay the SAME vulnerable authorizer: no decision changes, yet the invariant fires.
+    result = RUNNER.invoke(
+        app,
+        [
+            "diff",
+            "-c",
+            str(config_path),
+            "--baseline",
+            str(snapshot_path),
+            *report_options(tmp_path),
+        ],
+    )
+    assert result.exit_code == 1, result.output
+    report = json.loads((tmp_path / "report.json").read_text())
+    kinds = {item["kind"] for item in report["findings"]}
+    assert kinds == {"invariant_violation"}
+    assert all(item["change"] is None for item in report["findings"])
+
+
 def test_crash_timeout_and_invalid_return_exit_three(tmp_path: Path) -> None:
     authorizers = {
         "crash": "def authorize(s,a,r,c): raise RuntimeError('boom')\n",
