@@ -13,7 +13,7 @@ from permissiondiff.engine import (
     invariant_findings,
 )
 from permissiondiff.evaluator import evaluate_cases
-from permissiondiff.generator import generate_cases, shrink_findings
+from permissiondiff.generator import generate_cases
 from permissiondiff.invariants import build_invariants
 from permissiondiff.models import AuthorizationCase, CaseEvaluation, ComparisonResult, Finding
 from permissiondiff.snapshot import Snapshot, load_snapshot, snapshot_from_evaluations
@@ -38,10 +38,7 @@ def run_test(
     cases = generate_cases(config, seed=seed, max_examples=max_examples)
     evaluations = _evaluate(config, cases, workdir)
     invariants = build_invariants(config.invariants, workdir=workdir)
-    findings = shrink_findings(
-        invariant_findings(evaluations, invariants, minimize=False),
-        seed=seed,
-    )
+    findings = invariant_findings(evaluations, invariants)
     return RunResult(len(cases), tuple(findings))
 
 
@@ -79,13 +76,13 @@ def run_diff(
                 )
             )
     invariants = build_invariants(config.invariants, workdir=workdir)
-    findings = shrink_findings(
-        [
-            *comparison_findings(comparisons, minimize=False),
-            *invariant_findings(evaluations, invariants, minimize=False),
-        ],
-        seed=snapshot.seed,
-    )
+    # Comparison and invariant findings never share an equivalence key (their
+    # FindingKind differs), so minimizing each group independently is equivalent
+    # to minimizing the combined list, and it preserves equivalent-case counts.
+    findings = [
+        *comparison_findings(comparisons),
+        *invariant_findings(evaluations, invariants),
+    ]
     return RunResult(len(cases), tuple(findings))
 
 

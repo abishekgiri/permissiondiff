@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import random
 from collections.abc import Callable, Iterable
-from dataclasses import replace
 
-from hypothesis import HealthCheck, Phase, find, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import seed as hypothesis_seed
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 
 from permissiondiff.config import PermissionDiffConfig
-from permissiondiff.engine import finding_case_complexity, finding_equivalence_key
-from permissiondiff.models import Action, AuthorizationCase, Context, Finding, Resource, Subject
+from permissiondiff.models import Action, AuthorizationCase, Context, Resource, Subject
 
 
 def case_strategy(config: PermissionDiffConfig) -> SearchStrategy[AuthorizationCase]:
@@ -78,30 +75,6 @@ def generate_cases(
         collect()
 
     return sorted(cases_by_fingerprint.values(), key=lambda case: case.fingerprint)[:limit]
-
-
-def shrink_findings(findings: Iterable[Finding], *, seed: int) -> list[Finding]:
-    """Use Hypothesis shrinking to select one minimal exact-corpus reproduction."""
-    groups: dict[tuple[object, ...], list[Finding]] = {}
-    for finding in findings:
-        groups.setdefault(finding_equivalence_key(finding), []).append(finding)
-
-    minimized: list[Finding] = []
-    for index, equivalents in enumerate(groups.values()):
-        ordered = sorted(equivalents, key=finding_case_complexity)
-        smallest = find(
-            st.sampled_from(ordered),
-            equivalents.__contains__,
-            settings=settings(
-                max_examples=max(10, len(ordered) * 2),
-                database=None,
-                deadline=None,
-                phases=(Phase.generate, Phase.shrink),
-            ),
-            random=random.Random(seed + index),
-        )
-        minimized.append(replace(smallest, equivalent_cases=len(equivalents)))
-    return sorted(minimized, key=lambda finding: finding.semantic_key)
 
 
 def _coverage_cases(config: PermissionDiffConfig) -> Iterable[AuthorizationCase]:

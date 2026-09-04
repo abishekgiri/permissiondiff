@@ -1,17 +1,7 @@
 """Property-oriented tests for declared-domain generation."""
 
 from permissiondiff.config import PermissionDiffConfig
-from permissiondiff.generator import generate_cases, shrink_findings
-from permissiondiff.models import (
-    Action,
-    AuthorizationCase,
-    Context,
-    Finding,
-    FindingKind,
-    Resource,
-    Severity,
-    Subject,
-)
+from permissiondiff.generator import generate_cases
 
 
 def config() -> PermissionDiffConfig:
@@ -52,27 +42,3 @@ def test_generation_uses_only_declared_entities_and_is_bounded() -> None:
 def test_declared_numeric_boundaries_are_explored() -> None:
     amounts = {case.context.amount for case in generate_cases(config(), seed=42)}
     assert {0, 499, 500, 501, 999, 1000} & amounts
-
-
-def test_hypothesis_shrinking_selects_minimal_exact_corpus_reproduction() -> None:
-    findings = [
-        Finding(
-            kind=FindingKind.INVARIANT_VIOLATION,
-            severity=Severity.CRITICAL,
-            case=AuthorizationCase(
-                Subject("alice", "acme", "support"),
-                Action("read"),
-                Resource("invoice", "invoice", "globex", "bob"),
-                Context(amount),
-            ),
-            message="cross tenant",
-            invariant="tenant_isolation",
-        )
-        for amount in (1000, 0, 500)
-    ]
-
-    minimized = shrink_findings(findings, seed=42)
-
-    assert len(minimized) == 1
-    assert minimized[0].case.context.amount == 0
-    assert minimized[0].equivalent_cases == 3

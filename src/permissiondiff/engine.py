@@ -47,8 +47,6 @@ def compare_decisions(
 def invariant_findings(
     evaluations: Iterable[CaseEvaluation],
     invariants: Iterable[Invariant],
-    *,
-    minimize: bool = True,
 ) -> list[Finding]:
     """Evaluate invariants and return minimized, deduplicated violations."""
     findings: list[Finding] = []
@@ -78,12 +76,10 @@ def invariant_findings(
                         invariant=result.name,
                     )
                 )
-    return minimize_findings(findings) if minimize else findings
+    return minimize_findings(findings)
 
 
-def comparison_findings(
-    comparisons: Iterable[ComparisonResult], *, minimize: bool = True
-) -> list[Finding]:
+def comparison_findings(comparisons: Iterable[ComparisonResult]) -> list[Finding]:
     """Convert changed decisions into minimized security findings."""
     findings: list[Finding] = []
     for comparison in comparisons:
@@ -111,7 +107,7 @@ def comparison_findings(
                     change=comparison.change,
                 )
             )
-    return minimize_findings(findings) if minimize else findings
+    return minimize_findings(findings)
 
 
 def minimize_findings(findings: Iterable[Finding]) -> list[Finding]:
