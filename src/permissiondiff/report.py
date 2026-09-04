@@ -70,9 +70,9 @@ def render_terminal(
             f"→ {case.action.name} → {case.resource.type}({case.resource.tenant or '-'})"
         )
         decisions = ""
-        if finding.baseline and finding.candidate:
+        if finding.baseline is not None and finding.candidate is not None:
             decisions = f" [{finding.baseline.value} → {finding.candidate.value}]"
-        elif finding.candidate:
+        elif finding.candidate is not None:
             decisions = f" [actual: {finding.candidate.value}]"
         equivalent = (
             f" ({finding.equivalent_cases} equivalent cases)"
