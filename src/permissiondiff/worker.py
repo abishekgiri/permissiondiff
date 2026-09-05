@@ -29,34 +29,39 @@ def evaluate_payload(authorizer_spec: str, payload: dict[str, Any]) -> dict[str,
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def main() -> int:
-    """Read one case from stdin and write exactly one JSON result to stdout.
+def _write_result(protocol_fd: int, result: dict[str, str]) -> None:
+    """Write exactly one canonical JSON result line to the private protocol channel."""
+    payload = json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n"
+    os.write(protocol_fd, payload.encode("utf-8"))
+    os.close(protocol_fd)
 
-    The authorizer and its import may write to file descriptor 1 -- through
-    ``print``, C extensions, or shelled-out subprocesses. Any such output would
-    corrupt the JSON result channel the parent parses. To contain it, fd 1 is
-    duplicated aside and then redirected onto stderr for the whole evaluation;
-    the result is written to the saved original stdout afterwards.
+
+def main() -> int:
+    """Read one case from stdin and write exactly one JSON result to the parent.
+
+    The result travels on a *private* channel: fd 1 is duplicated to a fresh descriptor
+    before any user code runs, and fd 1 itself is then pointed at stderr for the **entire**
+    remaining process lifetime and never restored. Everything the authorizer or its module
+    writes to fd 1 -- ``print``, raw ``os.write(1, ...)``, C extensions, import-time output,
+    and crucially ``atexit``/interpreter-shutdown output -- therefore lands on stderr and can
+    never corrupt the protocol. PermissionDiff writes its JSON only through the duplicated
+    original stdout. (Uses ``os.dup``/``os.dup2``; portable to POSIX and Windows.)
     """
     if len(sys.argv) != 2:
-        print(json.dumps({"error": "worker requires one authorizer spec"}))
+        # No user code has run yet; fd 1 is still the real stdout.
+        os.write(1, (json.dumps({"error": "worker requires one authorizer spec"}) + "\n").encode())
         return 2
 
-    saved_stdout_fd = os.dup(1)
+    protocol_fd = os.dup(1)  # private copy of the original stdout for the result only
+    os.dup2(2, 1)  # fd 1 -> stderr for the rest of the process; never restored
     try:
-        os.dup2(2, 1)  # redirect fd 1 onto stderr so user output cannot leak here
-        try:
-            payload = json.loads(sys.stdin.read())
-            if not isinstance(payload, dict):
-                raise ValueError("worker input must be an object")
-            result = evaluate_payload(sys.argv[1], payload)
-        except BaseException as exc:
-            result = {"error": f"worker input error: {type(exc).__name__}: {exc}"}
-        sys.stdout.flush()  # flush any buffered user output onto the redirected fd
-    finally:
-        os.dup2(saved_stdout_fd, 1)  # restore the real stdout
-        os.close(saved_stdout_fd)
-    print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        payload = json.loads(sys.stdin.read())
+        if not isinstance(payload, dict):
+            raise ValueError("worker input must be an object")
+        result = evaluate_payload(sys.argv[1], payload)
+    except BaseException as exc:
+        result = {"error": f"worker input error: {type(exc).__name__}: {exc}"}
+    _write_result(protocol_fd, result)
     return 0
 
 

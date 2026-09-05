@@ -32,6 +32,18 @@ NOISY_AUTHORIZER = (
     "    return Decision.ALLOW\n"
 )
 
+# Emits stdout during interpreter shutdown, AFTER a valid Decision is returned.
+ATEXIT_AUTHORIZER = (
+    "import atexit, os, sys\n"
+    "from permissiondiff import Decision\n"
+    "@atexit.register\n"
+    "def _late():\n"
+    "    sys.stdout.write('atexit stdout noise\\n')\n"
+    "    os.write(1, b'atexit raw fd-1 noise\\n')\n"
+    "def authorize(subject, action, resource, context):\n"
+    "    return Decision.ALLOW\n"
+)
+
 
 def _run_worker(
     args: list[str], stdin: str, cwd: Path | None = None
@@ -56,6 +68,24 @@ def test_stdout_writing_authorizer_is_still_evaluated(tmp_path: Path) -> None:
     result = evaluate_case(CASE, spec, workdir=tmp_path, timeout_seconds=5)
     assert result.error is None
     assert result.decision is Decision.ALLOW
+
+
+def test_atexit_stdout_after_valid_decision_does_not_corrupt_result(tmp_path: Path) -> None:
+    """Shutdown/atexit output on fd 1 must not turn a valid Decision into an error."""
+    spec = write_authorizer(tmp_path, ATEXIT_AUTHORIZER)
+    result = evaluate_case(CASE, spec, workdir=tmp_path, timeout_seconds=5)
+    assert result.error is None
+    assert result.decision is Decision.ALLOW
+
+
+def test_atexit_noise_is_diverted_to_stderr_only(tmp_path: Path) -> None:
+    write_authorizer(tmp_path, ATEXIT_AUTHORIZER)
+    proc = _run_worker(["auth:authorize"], json.dumps(PAYLOAD), cwd=tmp_path)
+    assert proc.returncode == 0
+    # stdout is exactly one JSON object; the atexit writes landed on stderr.
+    assert json.loads(proc.stdout) == {"decision": "ALLOW"}
+    assert "atexit stdout noise" in proc.stderr
+    assert "atexit raw fd-1 noise" in proc.stderr
 
 
 # --- direct evaluate_payload unit tests ---
