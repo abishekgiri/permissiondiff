@@ -251,6 +251,25 @@ def test_baseline_that_already_violates_an_invariant_is_still_caught(tmp_path: P
     assert all(item["change"] is None for item in report["findings"])
 
 
+def test_custom_invariant_systemexit_never_reports_success(tmp_path: Path) -> None:
+    """A custom invariant that calls sys.exit(0) must exit 3, never 0."""
+    spec = write_authorizer(tmp_path, SAFE_AUTHORIZER, "safe_for_custom")
+    (tmp_path / "exit_rules.py").write_text(
+        "def boom(case, decision):\n    raise SystemExit(0)\n", encoding="utf-8"
+    )
+    config_path = write_config(
+        tmp_path,
+        spec,
+        invariants=[{"custom": {"name": "boom", "callable": "exit_rules:boom"}}],
+    )
+    result = RUNNER.invoke(
+        app,
+        ["test", "-c", str(config_path), "--max-examples", "2", *report_options(tmp_path)],
+    )
+    assert result.exit_code == 3, result.output
+    assert "boom" in result.output
+
+
 def test_crash_timeout_and_invalid_return_exit_three(tmp_path: Path) -> None:
     authorizers = {
         "crash": "def authorize(s,a,r,c): raise RuntimeError('boom')\n",

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from permissiondiff.errors import InvariantDefinitionError
+from permissiondiff.errors import InvariantDefinitionError, InvariantEvaluationError
 from permissiondiff.loader import load_callable
 from permissiondiff.models import AuthorizationCase, Decision, InvariantResult
 
@@ -100,11 +100,25 @@ class CustomInvariant:
     function: Callable[[AuthorizationCase, Decision], bool | InvariantResult]
 
     def evaluate(self, case: AuthorizationCase, decision: Decision) -> InvariantResult:
-        """Validate and normalize the custom invariant result."""
+        """Validate and normalize the custom invariant result, never failing open.
+
+        User code runs in this (parent) process, so it may raise ``SystemExit`` or
+        ``KeyboardInterrupt`` as well as ordinary exceptions. Left uncaught, a ``SystemExit(0)``
+        would terminate PermissionDiff with a success exit code -- reporting an incomplete
+        evaluation as a pass. Every such termination is converted, at this smallest possible
+        boundary, into an explicit ``InvariantEvaluationError`` (exit 3). Only these three
+        categories are converted; any other ``BaseException`` (e.g. ``GeneratorExit``) is left to
+        propagate deliberately.
+        """
         try:
             result = self.function(case, decision)
+        except (SystemExit, KeyboardInterrupt) as exc:
+            raise InvariantEvaluationError(
+                f"custom invariant {self.name!r} terminated the process "
+                f"({type(exc).__name__}); the evaluation is incomplete and cannot be trusted"
+            ) from exc
         except Exception as exc:
-            raise InvariantDefinitionError(
+            raise InvariantEvaluationError(
                 f"custom invariant {self.name!r} crashed: {exc}"
             ) from exc
         if isinstance(result, InvariantResult):
@@ -119,8 +133,9 @@ class CustomInvariant:
                     else f"Custom invariant {self.name!r} holds"
                 ),
             )
-        raise InvariantDefinitionError(
-            f"custom invariant {self.name!r} returned {type(result).__name__}, expected bool"
+        raise InvariantEvaluationError(
+            f"custom invariant {self.name!r} returned {type(result).__name__}, "
+            "expected bool or InvariantResult"
         )
 
 
@@ -158,7 +173,14 @@ def build_invariants(declarations: list[str | dict[str, Any]], *, workdir: Path)
                 raise InvariantDefinitionError(
                     "custom invariant requires callable and optional name"
                 )
-            invariants.append(CustomInvariant(custom_name, _load_from_workdir(spec, workdir)))
+            try:
+                function = _load_from_workdir(spec, workdir)
+            except (SystemExit, KeyboardInterrupt) as exc:
+                raise InvariantEvaluationError(
+                    f"custom invariant {custom_name!r} terminated the process while importing "
+                    f"{spec!r} ({type(exc).__name__}); the evaluation cannot be trusted"
+                ) from exc
+            invariants.append(CustomInvariant(custom_name, function))
         else:
             raise InvariantDefinitionError(f"unknown invariant {name!r}")
     return invariants
