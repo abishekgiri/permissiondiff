@@ -23,3 +23,13 @@ class SnapshotVersionError(PermissionDiffError):
 
 class InvariantDefinitionError(PermissionDiffError):
     """Raised when an invariant declaration is invalid."""
+
+
+class InvariantEvaluationError(PermissionDiffError):
+    """Raised when a custom invariant crashes, terminates the process, or returns invalid data.
+
+    Distinct from ``InvariantDefinitionError`` (a configuration problem, exit 2): this is a
+    runtime evaluation failure and maps to the evaluation/runtime exit code (3). A custom
+    invariant that raises ``SystemExit``/``KeyboardInterrupt`` must surface as this error so an
+    incomplete evaluation can never be reported as success.
+    """

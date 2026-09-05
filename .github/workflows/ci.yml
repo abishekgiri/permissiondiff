@@ -42,9 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # Non-blocking: this step needs the repository dependency graph, which may
-      # not be enabled. It reports advisories when available but never fails the
-      # pull request. Enable Settings -> Security & analysis -> Dependency graph
-      # to make it actionable.
+      # Blocking gate: the repository dependency graph is enabled (Dependabot
+      # alerts are active), so dependency review can fail a pull request that
+      # introduces a dependency violating the configured advisory rules.
       - uses: actions/dependency-review-action@v5
-        continue-on-error: true

@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-04
+
+### Fixed
+
+- A custom invariant that terminated the process (for example `SystemExit(0)`) could exit
+  PermissionDiff with a success code, reporting an incomplete evaluation as a pass. Custom
+  invariant termination, crashes, and invalid return values are now explicit evaluation errors
+  (exit 3) and never fail open.
+- The subprocess worker kept authorizer output off the result channel only until interpreter
+  shutdown, so `atexit`/shutdown writes to stdout could corrupt the JSON result and turn a valid
+  decision into an error. The worker now writes results on a private descriptor and redirects
+  stdout to stderr for the entire process lifetime.
+
+### Hardened
+
+- Restored dependency-review as a blocking pull-request gate now that the repository dependency
+  graph is active.
+- Added security-critical regression tests for custom-invariant termination/return handling and
+  for late-lifetime worker stdout.
+
+### Internal
+
+- No product features were added; this is a correctness and hardening patch.
+
 ## [0.1.0] - 2026-09-03
 
 ### Added
@@ -29,5 +53,6 @@ All notable changes to this project are documented here. The format follows
 - Reproducibility requires deterministic authorizer code and matching package, Python,
   configuration, seed, and corpus inputs.
 
-[Unreleased]: https://github.com/abishekgiri/permissiondiff/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/abishekgiri/permissiondiff/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/abishekgiri/permissiondiff/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/abishekgiri/permissiondiff/releases/tag/v0.1.0
