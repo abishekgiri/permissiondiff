@@ -187,7 +187,7 @@ The repository's thin composite action invokes the same CLI without duplicating 
 ```
 
 Check out the calling repository before this step and make sure the baseline is present in CI.
-Use `@v0.1.0` to pin this release; `@v0` follows compatible v0 releases. The
+Use `@v0.1.1` to pin the latest release; `@v0` follows compatible v0 releases. The
 [published-consumer smoke test](https://github.com/abishekgiri/permissiondiff/blob/main/.github/workflows/published-smoke.yml)
 exercises the PyPI package and the remote action in a fresh workspace without a source checkout.
 
