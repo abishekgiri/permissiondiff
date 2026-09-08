@@ -434,3 +434,36 @@ def test_mine_reports_evaluation_errors_as_exit_three(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 3, result.output
+
+
+def test_delegation_escalation_is_caught(tmp_path: Path) -> None:
+    """An agent allowed where its delegator is denied is a delegation escalation (exit 1)."""
+    spec = write_authorizer(
+        tmp_path,
+        "from permissiondiff import Decision\n"
+        "def authorize(subject, action, resource, context):\n"
+        "    return Decision.ALLOW if subject.role == 'agent' else Decision.DENY\n",
+        "deleg_auth",
+    )
+    config = {
+        "authorizer": spec,
+        "subjects": [
+            {"id": "admin", "tenant": "acme", "role": "admin"},
+            {"id": "agent", "tenant": "acme", "role": "agent", "delegated_by": ["admin"]},
+        ],
+        "resources": [{"id": "inv", "type": "invoice", "tenant": "acme", "owner_id": "admin"}],
+        "actions": ["refund"],
+        "invariants": [],
+        "generation": {"max_examples": 8},
+        "execution": {"timeout_seconds": 5},
+    }
+    config_path = tmp_path / "permissiondiff.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    result = RUNNER.invoke(
+        app,
+        ["test", "-c", str(config_path), "--max-examples", "8", *report_options(tmp_path)],
+    )
+    assert result.exit_code == 1, result.output
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert any(item["invariant"] == "delegation" for item in report["findings"])

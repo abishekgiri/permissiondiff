@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Delegation checks for agent/on-behalf-of principals: a subject may declare `delegated_by: [id, ...]`,
+  and PermissionDiff enforces the least-privilege intersection rule -- a delegated principal allowed
+  where any delegator is denied (on the identical action/resource/context) is a critical
+  privilege-escalation finding. `delegated_by` is serialized only when present, so existing case
+  fingerprints and snapshots are unchanged. (Live agent/MCP tool-call interception remains out of
+  scope; this is the deterministic, offline core of the delegation model.)
 - Policy-engine adapter toolkit (`permissiondiff.adapters`, kept out of the core): `from_boolean`
   and `from_decision` wrap an SDK check as an authorizer, and `http_authorizer` queries an
   HTTP-JSON policy endpoint (OPA-style) with the standard library only. Example adapters for OPA,

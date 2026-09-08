@@ -51,15 +51,28 @@ class Subject:
     tenant: str | None = None
     role: str | None = None
     attributes: JsonObject = field(default_factory=dict)
+    delegated_by: tuple[str, ...] = ()
+    """Ids of the principals this subject acts on behalf of (delegation chain), if any.
+
+    Used by the delegation check: a delegated principal must never obtain more authority than any
+    principal it acts on behalf of (least-privilege intersection).
+    """
 
     def to_dict(self) -> JsonObject:
-        """Return a JSON-compatible representation."""
-        return {
+        """Return a JSON-compatible representation.
+
+        ``delegated_by`` is included only when non-empty, so case fingerprints for ordinary
+        (non-delegated) subjects are unchanged and remain compatible with existing snapshots.
+        """
+        data: JsonObject = {
             "id": self.id,
             "tenant": self.tenant,
             "role": self.role,
             "attributes": self.attributes,
         }
+        if self.delegated_by:
+            data["delegated_by"] = list(self.delegated_by)
+        return data
 
     @classmethod
     def from_dict(cls, data: JsonObject) -> Subject:
@@ -69,6 +82,7 @@ class Subject:
             tenant=_optional_string(data.get("tenant")),
             role=_optional_string(data.get("role")),
             attributes=dict(data.get("attributes", {})),
+            delegated_by=tuple(str(principal) for principal in data.get("delegated_by", ())),
         )
 
 

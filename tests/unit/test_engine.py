@@ -6,6 +6,7 @@ from hypothesis import strategies as st
 from permissiondiff.engine import (
     classify_change,
     compare_decisions,
+    delegation_findings,
     mine_grants,
     minimize_findings,
 )
@@ -113,3 +114,44 @@ def test_mine_grants_ignores_errors_and_is_deterministic() -> None:
     allow = _eval("support", "acme", "alice", Decision.ALLOW)
     assert mine_grants([err]) == []
     assert [g.key for g in mine_grants([allow, err])] == [g.key for g in mine_grants([err, allow])]
+
+
+# --- delegation (least-privilege intersection) ---
+
+
+def _deleg_eval(subject: Subject, decision: Decision) -> CaseEvaluation:
+    return CaseEvaluation(
+        AuthorizationCase(
+            subject,
+            Action("refund"),
+            Resource("inv", "invoice", "acme", "alice"),
+            Context(),
+        ),
+        decision=decision,
+    )
+
+
+def test_delegation_flags_agent_exceeding_delegator() -> None:
+    admin = Subject("admin", "acme", "admin")
+    agent = Subject("agent", "acme", "agent", delegated_by=("admin",))
+    findings = delegation_findings(
+        [
+            _deleg_eval(agent, Decision.ALLOW),  # delegated principal allowed
+            _deleg_eval(admin, Decision.DENY),  # delegator denied on the identical case
+        ]
+    )
+    assert len(findings) == 1
+    assert findings[0].invariant == "delegation"
+    assert "escalation" in findings[0].message
+
+
+def test_delegation_allows_agent_within_delegator_authority() -> None:
+    admin = Subject("admin", "acme", "admin")
+    agent = Subject("agent", "acme", "agent", delegated_by=("admin",))
+    findings = delegation_findings(
+        [
+            _deleg_eval(agent, Decision.ALLOW),
+            _deleg_eval(admin, Decision.ALLOW),  # delegator also allowed -> no escalation
+        ]
+    )
+    assert findings == []

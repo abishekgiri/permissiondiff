@@ -21,6 +21,7 @@ class SubjectConfig(BaseModel):
     tenant: str | None = None
     role: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
+    delegated_by: list[str] = Field(default_factory=list)
 
     def to_domain(self) -> Subject:
         """Convert boundary validation data into the core model."""
@@ -29,6 +30,7 @@ class SubjectConfig(BaseModel):
             tenant=self.tenant,
             role=self.role,
             attributes=self.attributes,
+            delegated_by=tuple(self.delegated_by),
         )
 
 
