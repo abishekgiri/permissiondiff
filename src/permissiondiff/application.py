@@ -11,11 +11,18 @@ from permissiondiff.engine import (
     compare_decisions,
     comparison_findings,
     invariant_findings,
+    mine_grants,
 )
 from permissiondiff.evaluator import evaluate_cases
 from permissiondiff.generator import generate_cases
 from permissiondiff.invariants import build_invariants
-from permissiondiff.models import AuthorizationCase, CaseEvaluation, ComparisonResult, Finding
+from permissiondiff.models import (
+    AuthorizationCase,
+    CaseEvaluation,
+    ComparisonResult,
+    Finding,
+    Grant,
+)
 from permissiondiff.snapshot import Snapshot, load_snapshot, snapshot_from_evaluations
 
 
@@ -25,6 +32,15 @@ class RunResult:
 
     cases_evaluated: int
     findings: tuple[Finding, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MineResult:
+    """Effective grant surface plus any cases that could not be evaluated."""
+
+    cases_evaluated: int
+    grants: tuple[Grant, ...]
+    errors: tuple[CaseEvaluation, ...]
 
 
 def run_test(
@@ -40,6 +56,21 @@ def run_test(
     invariants = build_invariants(config.invariants, workdir=workdir)
     findings = invariant_findings(evaluations, invariants)
     return RunResult(len(cases), tuple(findings))
+
+
+def run_mine(
+    config: PermissionDiffConfig,
+    *,
+    workdir: Path,
+    seed: int,
+    max_examples: int | None = None,
+) -> MineResult:
+    """Generate cases, evaluate the authorizer, and mine its effective grant surface."""
+    cases = generate_cases(config, seed=seed, max_examples=max_examples)
+    evaluations = _evaluate(config, cases, workdir)
+    grants = mine_grants(evaluations)
+    errors = tuple(evaluation for evaluation in evaluations if evaluation.error is not None)
+    return MineResult(len(cases), tuple(grants), errors)
 
 
 def create_snapshot(

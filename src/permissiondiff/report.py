@@ -9,9 +9,10 @@ from rich.console import Console
 from rich.table import Table
 
 from permissiondiff.config import FailOnConfig
-from permissiondiff.models import ChangeType, Finding, FindingKind, JsonObject, Severity
+from permissiondiff.models import ChangeType, Finding, FindingKind, Grant, JsonObject, Severity
 
 REPORT_SCHEMA_VERSION = 1
+GRANTS_SCHEMA_VERSION = 1
 
 
 def assign_finding_ids(findings: list[Finding] | tuple[Finding, ...]) -> list[Finding]:
@@ -86,6 +87,59 @@ def render_terminal(
             str(path),
         )
     output.print(table)
+
+
+def persist_grants(
+    grants: list[Grant],
+    *,
+    report_path: Path,
+    cases_evaluated: int,
+) -> None:
+    """Write the canonical effective-grant-surface report as JSON."""
+    report: JsonObject = {
+        "schema_version": GRANTS_SCHEMA_VERSION,
+        "cases_evaluated": cases_evaluated,
+        "grant_count": len(grants),
+        "grants": [grant.to_dict() for grant in grants],
+    }
+    _write_json(report_path, report)
+
+
+def render_grants(
+    grants: list[Grant],
+    *,
+    cases_evaluated: int,
+    console: Console | None = None,
+) -> None:
+    """Render the effective grant surface, flagging broad (cross-tenant / non-owner) grants."""
+    output = console or Console()
+    broad = sum(1 for grant in grants if grant.broad)
+    output.print(
+        f"[bold]PermissionDiff[/bold] mined {len(grants)} effective grant(s) "
+        f"from {cases_evaluated:,} cases ([yellow]{broad} broad[/yellow])"
+    )
+    if not grants:
+        output.print("No ALLOW decisions were observed in the generated corpus.")
+        return
+    table = Table(show_header=True, header_style="bold")
+    for column in ("Role", "Action", "Resource", "Tenant", "Ownership", "Cases", "Least-privilege"):
+        table.add_column(column)
+    for grant in grants:
+        flag = "[yellow]broad[/yellow]" if grant.broad else "[green]scoped[/green]"
+        table.add_row(
+            grant.role or "-",
+            grant.action,
+            grant.resource_type,
+            grant.tenant_relation,
+            grant.ownership,
+            str(grant.count),
+            flag,
+        )
+    output.print(table)
+    output.print(
+        "Broad grants cross a tenant boundary or reach a non-owned resource; "
+        "review them first when tightening toward least privilege."
+    )
 
 
 def result_exit_code(findings: list[Finding], fail_on: FailOnConfig) -> int:
