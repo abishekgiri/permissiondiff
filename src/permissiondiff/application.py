@@ -61,8 +61,41 @@ def run_diff(
     workdir: Path,
     baseline_path: Path,
 ) -> RunResult:
+    """Replay every exact baseline case (from a snapshot file) against the candidate."""
+    return _diff_against_snapshot(config, workdir=workdir, snapshot=load_snapshot(baseline_path))
+
+
+def run_git_diff(
+    config: PermissionDiffConfig,
+    *,
+    workdir: Path,
+    ref: str,
+    seed: int,
+    max_examples: int | None = None,
+) -> RunResult:
+    """Diff the candidate against the baseline authorizer as it existed at a git ref.
+
+    The ref is checked out into a temporary detached worktree; the candidate config's domain
+    generates the corpus, which is evaluated against the baseline authorizer code there. The
+    candidate then replays that exact corpus in the working tree.
+    """
+    from permissiondiff.gitref import baseline_worktree, repo_root
+
+    relative = workdir.resolve().relative_to(repo_root(workdir))
+    with baseline_worktree(workdir, ref) as tree:
+        baseline = create_snapshot(
+            config, workdir=tree / relative, seed=seed, max_examples=max_examples
+        )
+    return _diff_against_snapshot(config, workdir=workdir, snapshot=baseline)
+
+
+def _diff_against_snapshot(
+    config: PermissionDiffConfig,
+    *,
+    workdir: Path,
+    snapshot: Snapshot,
+) -> RunResult:
     """Replay every exact baseline case against the candidate authorizer."""
-    snapshot = load_snapshot(baseline_path)
     cases = [snapshot_case.case for snapshot_case in snapshot.cases]
     evaluations = _evaluate(config, cases, workdir)
     comparisons: list[ComparisonResult] = []

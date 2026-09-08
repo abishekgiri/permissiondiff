@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Git-aware diffing: `permissiondiff diff --git-ref REF` evaluates the baseline authorizer as it
+  existed at a git ref (checked out into a temporary, auto-removed detached worktree) and replays
+  that exact corpus against the working tree -- no manual snapshot file needed. `--baseline` and
+  `--git-ref` are mutually exclusive; exactly one is required.
 - Persistent worker execution (default): the authorizer is imported once in a long-lived worker
   and cases stream over a line-delimited protocol, roughly an order of magnitude faster on large
   corpora. Each crash or timeout kills and re-spawns the worker so one bad case cannot corrupt

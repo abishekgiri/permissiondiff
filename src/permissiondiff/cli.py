@@ -9,9 +9,9 @@ import typer
 from rich.console import Console
 
 from permissiondiff import __version__
-from permissiondiff.application import create_snapshot, run_diff, run_test
+from permissiondiff.application import create_snapshot, run_diff, run_git_diff, run_test
 from permissiondiff.config import PermissionDiffConfig, load_config
-from permissiondiff.errors import PermissionDiffError
+from permissiondiff.errors import ConfigurationError, PermissionDiffError
 from permissiondiff.models import Finding
 from permissiondiff.report import (
     assign_finding_ids,
@@ -138,8 +138,18 @@ def snapshot(
 
 @app.command()
 def diff(
-    baseline: Annotated[Path, typer.Option("--baseline", help="Baseline snapshot path.")],
+    baseline: Annotated[
+        Path | None, typer.Option("--baseline", help="Baseline snapshot path.")
+    ] = None,
+    git_ref: Annotated[
+        str | None,
+        typer.Option("--git-ref", help="Baseline git ref to evaluate in a temporary worktree."),
+    ] = None,
     config: CONFIG_OPTION = Path("permissiondiff.yaml"),
+    seed: SEED_OPTION = 42,
+    max_examples: Annotated[
+        int | None, typer.Option("--max-examples", min=1, help="Override corpus size (--git-ref).")
+    ] = None,
     json_output: Annotated[
         Path, typer.Option("--json-output", help="Machine-readable report path.")
     ] = Path(".permissiondiff/report.json"),
@@ -148,10 +158,23 @@ def diff(
     ] = Path(".permissiondiff/failures"),
     debug: DEBUG_OPTION = False,
 ) -> None:
-    """Replay the exact baseline corpus against the candidate authorizer."""
+    """Replay the exact baseline corpus against the candidate authorizer.
+
+    Provide exactly one baseline source: --baseline (a snapshot file) or --git-ref (a git ref
+    whose authorizer is evaluated in a temporary worktree).
+    """
     try:
+        if (baseline is None) == (git_ref is None):
+            raise ConfigurationError("provide exactly one of --baseline or --git-ref")
         loaded = load_config(config)
-        result = run_diff(loaded, workdir=config.resolve().parent, baseline_path=baseline)
+        workdir = config.resolve().parent
+        if git_ref is not None:
+            result = run_git_diff(
+                loaded, workdir=workdir, ref=git_ref, seed=seed, max_examples=max_examples
+            )
+        else:
+            assert baseline is not None
+            result = run_diff(loaded, workdir=workdir, baseline_path=baseline)
         _finish_run(loaded, result.cases_evaluated, result.findings, failures_dir, json_output)
     except typer.Exit:
         raise
