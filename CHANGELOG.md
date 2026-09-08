@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Policy-engine adapter toolkit (`permissiondiff.adapters`, kept out of the core): `from_boolean`
+  and `from_decision` wrap an SDK check as an authorizer, and `http_authorizer` queries an
+  HTTP-JSON policy endpoint (OPA-style) with the standard library only. Example adapters for OPA,
+  OpenFGA, Auth0 FGA, Cedar, and SpiceDB ship under `examples/adapters/`. Adapters make read-only
+  decision calls; point them at a non-production policy instance.
 - Least-privilege mining: `permissiondiff mine` reports the authorizer's effective grant surface
   (each distinct role × action × resource-type × tenant-relation × ownership pattern it allows)
   and flags broad grants -- those crossing a tenant boundary or reaching a non-owned resource --
