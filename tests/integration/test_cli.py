@@ -313,3 +313,82 @@ def test_malformed_config_and_incompatible_snapshot_exit_two(tmp_path: Path) -> 
         ["diff", "-c", str(config_path), "--baseline", str(snapshot)],
     )
     assert old_result.exit_code == 2
+
+
+def _git(*args: str, cwd: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+
+
+def test_diff_git_ref_evaluates_baseline_in_worktree(tmp_path: Path) -> None:
+    """--git-ref diffs the working tree against the authorizer as it existed at a ref."""
+    _git("init", cwd=tmp_path)
+    _git("config", "user.email", "t@example.com", cwd=tmp_path)
+    _git("config", "user.name", "t", cwd=tmp_path)
+    (tmp_path / "auth.py").write_text(SAFE_AUTHORIZER, encoding="utf-8")
+    write_config(tmp_path, "auth:authorize")
+    _git("add", "-A", cwd=tmp_path)
+    _git("commit", "-m", "safe baseline", cwd=tmp_path)
+
+    # Working tree now drops the tenant check (candidate).
+    (tmp_path / "auth.py").write_text(VULNERABLE_AUTHORIZER, encoding="utf-8")
+
+    result = RUNNER.invoke(
+        app,
+        [
+            "diff",
+            "-c",
+            str(tmp_path / "permissiondiff.yaml"),
+            "--git-ref",
+            "HEAD",
+            "--seed",
+            "42",
+            *report_options(tmp_path),
+        ],
+    )
+    assert result.exit_code == 1, result.output
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert any(item["change"] == "newly_allowed" for item in report["findings"])
+    # The temporary worktree is cleaned up, leaving only the main one.
+    import subprocess
+
+    worktrees = subprocess.run(
+        ["git", "worktree", "list"], cwd=tmp_path, capture_output=True, text=True, check=True
+    )
+    assert len([line for line in worktrees.stdout.splitlines() if line.strip()]) == 1
+
+
+def test_diff_requires_exactly_one_baseline_source(tmp_path: Path) -> None:
+    spec = write_authorizer(tmp_path, SAFE_AUTHORIZER)
+    config_path = write_config(tmp_path, spec)
+    neither = RUNNER.invoke(app, ["diff", "-c", str(config_path)])
+    assert neither.exit_code == 2, neither.output
+    both = RUNNER.invoke(
+        app,
+        [
+            "diff",
+            "-c",
+            str(config_path),
+            "--baseline",
+            str(tmp_path / "x.json"),
+            "--git-ref",
+            "HEAD",
+        ],
+    )
+    assert both.exit_code == 2, both.output
+
+
+def test_diff_git_ref_unknown_ref_is_config_error(tmp_path: Path) -> None:
+    _git("init", cwd=tmp_path)
+    _git("config", "user.email", "t@example.com", cwd=tmp_path)
+    _git("config", "user.name", "t", cwd=tmp_path)
+    (tmp_path / "auth.py").write_text(SAFE_AUTHORIZER, encoding="utf-8")
+    write_config(tmp_path, "auth:authorize")
+    _git("add", "-A", cwd=tmp_path)
+    _git("commit", "-m", "init", cwd=tmp_path)
+    result = RUNNER.invoke(
+        app,
+        ["diff", "-c", str(tmp_path / "permissiondiff.yaml"), "--git-ref", "no-such-ref"],
+    )
+    assert result.exit_code == 2, result.output
