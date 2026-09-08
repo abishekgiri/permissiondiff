@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Persistent worker execution (default): the authorizer is imported once in a long-lived worker
+  and cases stream over a line-delimited protocol, roughly an order of magnitude faster on large
+  corpora. Each crash or timeout kills and re-spawns the worker so one bad case cannot corrupt
+  later cases, and output stays byte-identical for deterministic authorizers. Set
+  `execution.worker: process_per_case` to restore a fresh interpreter per case.
+
 ## [0.1.1] - 2026-09-04
 
 ### Fixed
