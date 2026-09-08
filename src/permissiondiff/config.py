@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -104,6 +104,15 @@ class ExecutionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     timeout_seconds: float = Field(default=2.0, gt=0, le=300)
+    worker: Literal["persistent", "process_per_case"] = "persistent"
+    """How cases reach the authorizer.
+
+    ``persistent`` (default) imports the authorizer once in a long-lived worker and streams cases
+    over a line-delimited protocol, re-spawning on any crash or timeout so a bad case cannot
+    corrupt later cases -- far faster on large corpora. ``process_per_case`` spawns a fresh
+    interpreter per case (maximum isolation, no shared import state); use it if an authorizer
+    relies on process-global state and cannot tolerate a shared import.
+    """
 
 
 class FailOnConfig(BaseModel):

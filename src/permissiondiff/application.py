@@ -96,4 +96,5 @@ def _evaluate(
         config.authorizer,
         workdir=workdir,
         timeout_seconds=config.execution.timeout_seconds,
+        mode=config.execution.worker,
     )
