@@ -136,6 +136,58 @@ def invariant_findings(
     return minimize_findings(findings)
 
 
+def _delegation_correlation(case: AuthorizationCase) -> str:
+    """Identity of a case ignoring the subject, so delegated and delegator cases correlate."""
+    return json.dumps(
+        {
+            "action": case.action.name,
+            "resource": case.resource.to_dict(),
+            "context": case.context.to_dict(),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def delegation_findings(evaluations: Iterable[CaseEvaluation]) -> list[Finding]:
+    """Flag delegated principals that obtain more authority than a principal they act for.
+
+    Enforces the least-privilege intersection rule: if a subject that acts on behalf of others is
+    ALLOWED for a case, every delegator evaluated on the identical (action, resource, context) must
+    also be ALLOWED. A delegator DENY under a delegated ALLOW is a privilege-escalation finding.
+    Pure and deterministic.
+    """
+    decisions: dict[tuple[str, str], Decision] = {}
+    delegated: list[CaseEvaluation] = []
+    for evaluation in evaluations:
+        if evaluation.decision is None:
+            continue
+        key = (_delegation_correlation(evaluation.case), evaluation.case.subject.id)
+        decisions[key] = evaluation.decision
+        if evaluation.case.subject.delegated_by and evaluation.decision is Decision.ALLOW:
+            delegated.append(evaluation)
+
+    findings: list[Finding] = []
+    for evaluation in delegated:
+        correlation = _delegation_correlation(evaluation.case)
+        for delegator_id in evaluation.case.subject.delegated_by:
+            if decisions.get((correlation, delegator_id)) is Decision.DENY:
+                findings.append(
+                    Finding(
+                        kind=FindingKind.INVARIANT_VIOLATION,
+                        severity=Severity.CRITICAL,
+                        case=evaluation.case,
+                        message=(
+                            f"Delegated principal {evaluation.case.subject.id!r} is allowed where "
+                            f"delegator {delegator_id!r} is denied (privilege escalation)"
+                        ),
+                        candidate=evaluation.decision,
+                        invariant="delegation",
+                    )
+                )
+    return minimize_findings(findings)
+
+
 def comparison_findings(comparisons: Iterable[ComparisonResult]) -> list[Finding]:
     """Convert changed decisions into minimized security findings."""
     findings: list[Finding] = []

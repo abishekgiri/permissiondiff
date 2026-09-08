@@ -10,6 +10,7 @@ from permissiondiff.config import PermissionDiffConfig
 from permissiondiff.engine import (
     compare_decisions,
     comparison_findings,
+    delegation_findings,
     invariant_findings,
     mine_grants,
 )
@@ -54,7 +55,10 @@ def run_test(
     cases = generate_cases(config, seed=seed, max_examples=max_examples)
     evaluations = _evaluate(config, cases, workdir)
     invariants = build_invariants(config.invariants, workdir=workdir)
-    findings = invariant_findings(evaluations, invariants)
+    findings = [
+        *invariant_findings(evaluations, invariants),
+        *delegation_findings(evaluations),
+    ]
     return RunResult(len(cases), tuple(findings))
 
 
@@ -146,6 +150,7 @@ def _diff_against_snapshot(
     findings = [
         *comparison_findings(comparisons),
         *invariant_findings(evaluations, invariants),
+        *delegation_findings(evaluations),
     ]
     return RunResult(len(cases), tuple(findings))
 

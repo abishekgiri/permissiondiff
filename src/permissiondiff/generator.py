@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from dataclasses import replace
 
 from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import seed as hypothesis_seed
@@ -74,7 +75,30 @@ def generate_cases(
 
         collect()
 
-    return sorted(cases_by_fingerprint.values(), key=lambda case: case.fingerprint)[:limit]
+    corpus = sorted(cases_by_fingerprint.values(), key=lambda case: case.fingerprint)[:limit]
+    return _with_delegation_parallels(config, corpus)
+
+
+def _with_delegation_parallels(
+    config: PermissionDiffConfig, corpus: list[AuthorizationCase]
+) -> list[AuthorizationCase]:
+    """Ensure each delegated case's delegators are evaluated on the identical case.
+
+    For every case whose subject acts on behalf of others, add the same (action, resource,
+    context) evaluated as each declared delegator, so the delegation check can compare a delegated
+    ALLOW against each delegator's decision. These parallels are additive (beyond ``max_examples``)
+    and deterministic; ordinary corpora are unchanged.
+    """
+    subjects_by_id = {subject.id: subject.to_domain() for subject in config.subjects}
+    by_fingerprint = {case.fingerprint: case for case in corpus}
+    for case in corpus:
+        for delegator_id in case.subject.delegated_by:
+            delegator = subjects_by_id.get(delegator_id)
+            if delegator is None:
+                continue
+            parallel = replace(case, subject=delegator)
+            by_fingerprint.setdefault(parallel.fingerprint, parallel)
+    return sorted(by_fingerprint.values(), key=lambda case: case.fingerprint)
 
 
 def _coverage_cases(config: PermissionDiffConfig) -> Iterable[AuthorizationCase]:
