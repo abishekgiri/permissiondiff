@@ -3,10 +3,16 @@
 from hypothesis import given
 from hypothesis import strategies as st
 
-from permissiondiff.engine import classify_change, compare_decisions, minimize_findings
+from permissiondiff.engine import (
+    classify_change,
+    compare_decisions,
+    mine_grants,
+    minimize_findings,
+)
 from permissiondiff.models import (
     Action,
     AuthorizationCase,
+    CaseEvaluation,
     ChangeType,
     Context,
     Decision,
@@ -65,3 +71,45 @@ def test_minimize_findings_selects_smallest_and_counts_equivalents() -> None:
     assert len(minimized) == 1
     assert minimized[0].case.context.amount == 0
     assert minimized[0].equivalent_cases == 3
+
+
+# --- least-privilege mining ---
+
+
+def _eval(role: str, tenant: str, owner: str, decision: Decision) -> CaseEvaluation:
+    return CaseEvaluation(
+        AuthorizationCase(
+            Subject("alice", "acme", role),
+            Action("read_invoice"),
+            Resource("inv", "invoice", tenant, owner),
+            Context(),
+        ),
+        decision=decision,
+    )
+
+
+def test_mine_grants_reports_only_allows_and_flags_broad() -> None:
+    evaluations = [
+        _eval("support", "acme", "alice", Decision.ALLOW),  # scoped (same tenant, owner)
+        _eval("support", "acme", "alice", Decision.ALLOW),  # duplicate -> count 2
+        _eval("support", "globex", "bob", Decision.ALLOW),  # broad (cross-tenant, non-owner)
+        _eval("support", "acme", "bob", Decision.DENY),  # ignored (DENY)
+    ]
+    grants = mine_grants(evaluations)
+    assert len(grants) == 2
+    scoped = next(g for g in grants if not g.broad)
+    broad = next(g for g in grants if g.broad)
+    assert scoped.tenant_relation == "same" and scoped.ownership == "owner" and scoped.count == 2
+    assert broad.tenant_relation == "different" and broad.ownership == "non_owner"
+
+
+def test_mine_grants_ignores_errors_and_is_deterministic() -> None:
+    from permissiondiff.models import AuthorizationCase as _AC
+
+    err = CaseEvaluation(
+        _AC(Subject("x", "acme", "support"), Action("read_invoice"), Resource("i", "invoice")),
+        error="boom",
+    )
+    allow = _eval("support", "acme", "alice", Decision.ALLOW)
+    assert mine_grants([err]) == []
+    assert [g.key for g in mine_grants([allow, err])] == [g.key for g in mine_grants([err, allow])]

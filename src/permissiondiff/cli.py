@@ -9,14 +9,22 @@ import typer
 from rich.console import Console
 
 from permissiondiff import __version__
-from permissiondiff.application import create_snapshot, run_diff, run_git_diff, run_test
+from permissiondiff.application import (
+    create_snapshot,
+    run_diff,
+    run_git_diff,
+    run_mine,
+    run_test,
+)
 from permissiondiff.config import PermissionDiffConfig, load_config
-from permissiondiff.errors import ConfigurationError, PermissionDiffError
+from permissiondiff.errors import ConfigurationError, EvaluationError, PermissionDiffError
 from permissiondiff.models import Finding
 from permissiondiff.report import (
     assign_finding_ids,
     explain_finding,
     persist_findings,
+    persist_grants,
+    render_grants,
     render_terminal,
     result_exit_code,
 )
@@ -99,6 +107,41 @@ def test_command(
             max_examples=max_examples,
         )
         _finish_run(loaded, result.cases_evaluated, result.findings, failures_dir, json_output)
+    except typer.Exit:
+        raise
+    except PermissionDiffError as exc:
+        _fail(exc, debug)
+    except Exception as exc:
+        _unexpected(exc, debug)
+
+
+@app.command()
+def mine(
+    config: CONFIG_OPTION = Path("permissiondiff.yaml"),
+    seed: SEED_OPTION = 42,
+    max_examples: Annotated[
+        int | None, typer.Option("--max-examples", min=1, help="Override corpus size.")
+    ] = None,
+    json_output: Annotated[
+        Path, typer.Option("--json-output", help="Machine-readable grant report path.")
+    ] = Path(".permissiondiff/grants.json"),
+    debug: DEBUG_OPTION = False,
+) -> None:
+    """Report the authorizer's effective grant surface for least-privilege review."""
+    try:
+        loaded = load_config(config)
+        result = run_mine(
+            loaded, workdir=config.resolve().parent, seed=seed, max_examples=max_examples
+        )
+        if result.errors:
+            # Never present a partial grant surface as complete.
+            raise EvaluationError(
+                f"{len(result.errors)} case(s) failed evaluation; "
+                f"first error: {result.errors[0].error}"
+            )
+        grants = list(result.grants)
+        persist_grants(grants, report_path=json_output, cases_evaluated=result.cases_evaluated)
+        render_grants(grants, cases_evaluated=result.cases_evaluated)
     except typer.Exit:
         raise
     except PermissionDiffError as exc:

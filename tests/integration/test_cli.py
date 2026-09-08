@@ -392,3 +392,45 @@ def test_diff_git_ref_unknown_ref_is_config_error(tmp_path: Path) -> None:
         ["diff", "-c", str(tmp_path / "permissiondiff.yaml"), "--git-ref", "no-such-ref"],
     )
     assert result.exit_code == 2, result.output
+
+
+def test_mine_reports_effective_grants(tmp_path: Path) -> None:
+    result = RUNNER.invoke(
+        app,
+        [
+            "mine",
+            "-c",
+            str(ROOT / "examples/multi_tenant/permissiondiff.yaml"),
+            "--seed",
+            "42",
+            "--json-output",
+            str(tmp_path / "grants.json"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    grants = json.loads((tmp_path / "grants.json").read_text())
+    assert grants["grant_count"] >= 1
+    # The vulnerable fixture allows cross-tenant reads, so a broad grant must surface.
+    assert any(g["broad"] for g in grants["grants"])
+
+
+def test_mine_reports_evaluation_errors_as_exit_three(tmp_path: Path) -> None:
+    spec = write_authorizer(
+        tmp_path,
+        "def authorize(s, a, r, c):\n    raise RuntimeError('boom')\n",
+        "crash_auth",
+    )
+    config_path = write_config(tmp_path, spec, invariants=[])
+    result = RUNNER.invoke(
+        app,
+        [
+            "mine",
+            "-c",
+            str(config_path),
+            "--max-examples",
+            "2",
+            "--json-output",
+            str(tmp_path / "g.json"),
+        ],
+    )
+    assert result.exit_code == 3, result.output

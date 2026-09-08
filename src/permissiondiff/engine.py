@@ -15,8 +15,65 @@ from permissiondiff.models import (
     Decision,
     Finding,
     FindingKind,
+    Grant,
     Severity,
 )
+
+
+def _tenant_relation(case: AuthorizationCase) -> str:
+    if case.subject.tenant is None or case.resource.tenant is None:
+        return "unknown"
+    return "same" if case.subject.tenant == case.resource.tenant else "different"
+
+
+def _ownership(case: AuthorizationCase) -> str:
+    if case.resource.owner_id is None:
+        return "unknown"
+    return "owner" if case.subject.id == case.resource.owner_id else "non_owner"
+
+
+def mine_grants(evaluations: Iterable[CaseEvaluation]) -> list[Grant]:
+    """Aggregate ALLOW decisions into the authorizer's effective, deduplicated grant surface.
+
+    Pure and deterministic. Each distinct (role, action, resource type, tenant relation, ownership)
+    pattern that the authorizer permits becomes one :class:`Grant`, keeping the smallest observed
+    case as its example and counting how many cases matched. Evaluation errors are ignored here;
+    callers surface those separately (mining describes what is allowed, it is not a gate).
+    """
+    groups: dict[tuple[str, str, str, str, str], list[CaseEvaluation]] = {}
+    for evaluation in evaluations:
+        if evaluation.decision is not Decision.ALLOW:
+            continue
+        case = evaluation.case
+        key = (
+            case.subject.role or "",
+            case.action.name,
+            case.resource.type,
+            _tenant_relation(case),
+            _ownership(case),
+        )
+        groups.setdefault(key, []).append(evaluation)
+
+    grants: list[Grant] = []
+    for members in groups.values():
+        example = min(members, key=lambda e: _case_complexity(e.case)).case
+        grants.append(
+            Grant(
+                role=example.subject.role,
+                action=example.action.name,
+                resource_type=example.resource.type,
+                tenant_relation=_tenant_relation(example),
+                ownership=_ownership(example),
+                count=len(members),
+                example=example,
+            )
+        )
+    return sorted(grants, key=lambda grant: grant.key)
+
+
+def _case_complexity(case: AuthorizationCase) -> tuple[int, str]:
+    serialized = json.dumps(case.to_dict(), sort_keys=True, separators=(",", ":"))
+    return (len(serialized), serialized)
 
 
 def classify_change(baseline: Decision, candidate: Decision) -> ChangeType:
@@ -147,5 +204,4 @@ def finding_equivalence_key(finding: Finding) -> tuple[object, ...]:
 
 def finding_case_complexity(finding: Finding) -> tuple[int, str]:
     """Order reproductions by compact canonical case representation."""
-    serialized = json.dumps(finding.case.to_dict(), sort_keys=True, separators=(",", ":"))
-    return (len(serialized), serialized)
+    return _case_complexity(finding.case)

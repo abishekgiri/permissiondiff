@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Least-privilege mining: `permissiondiff mine` reports the authorizer's effective grant surface
+  (each distinct role × action × resource-type × tenant-relation × ownership pattern it allows)
+  and flags broad grants -- those crossing a tenant boundary or reaching a non-owned resource --
+  for least-privilege review. Deterministic; exits 3 if any case fails to evaluate rather than
+  present a partial surface.
 - Git-aware diffing: `permissiondiff diff --git-ref REF` evaluates the baseline authorizer as it
   existed at a git ref (checked out into a temporary, auto-removed detached worktree) and replays
   that exact corpus against the working tree -- no manual snapshot file needed. `--baseline` and

@@ -268,6 +268,53 @@ class Finding:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class Grant:
+    """One entry in an authorizer's effective grant surface (an observed ALLOW pattern).
+
+    Least-privilege mining aggregates every ALLOW decision over the generated corpus into these
+    patterns. ``broad`` marks a grant that crosses a tenant boundary or reaches a non-owned
+    resource -- the first place to look when tightening toward least privilege.
+    """
+
+    role: str | None
+    action: str
+    resource_type: str
+    tenant_relation: str  # "same" | "different" | "unknown"
+    ownership: str  # "owner" | "non_owner" | "unknown"
+    count: int
+    example: AuthorizationCase
+
+    @property
+    def broad(self) -> bool:
+        """Whether this grant crosses a tenant boundary or reaches a non-owned resource."""
+        return self.tenant_relation == "different" or self.ownership == "non_owner"
+
+    @property
+    def key(self) -> tuple[str, str, str, str, str]:
+        """Stable identity for deterministic grouping and ordering."""
+        return (
+            self.role or "",
+            self.action,
+            self.resource_type,
+            self.tenant_relation,
+            self.ownership,
+        )
+
+    def to_dict(self) -> JsonObject:
+        """Return a machine-readable grant with one representative case."""
+        return {
+            "role": self.role,
+            "action": self.action,
+            "resource_type": self.resource_type,
+            "tenant_relation": self.tenant_relation,
+            "ownership": self.ownership,
+            "broad": self.broad,
+            "count": self.count,
+            "example": self.example.to_dict(),
+        }
+
+
 def _object(value: object) -> JsonObject:
     if not isinstance(value, dict):
         raise ValueError("expected an object")
