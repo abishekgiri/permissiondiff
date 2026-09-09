@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-08
+
 ### Added
 
 - Delegation checks for agent/on-behalf-of principals: a subject may declare `delegated_by: [id, ...]`,
@@ -81,6 +83,7 @@ All notable changes to this project are documented here. The format follows
 - Reproducibility requires deterministic authorizer code and matching package, Python,
   configuration, seed, and corpus inputs.
 
-[Unreleased]: https://github.com/abishekgiri/permissiondiff/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/abishekgiri/permissiondiff/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/abishekgiri/permissiondiff/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/abishekgiri/permissiondiff/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/abishekgiri/permissiondiff/releases/tag/v0.1.0

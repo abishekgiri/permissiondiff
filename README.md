@@ -131,6 +131,28 @@ invariants:
 
 The callable receives `(AuthorizationCase, Decision)` and returns `bool` or `InvariantResult`.
 
+## Least-privilege review
+
+`mine` reports the authorizer's effective grant surface — each distinct role × action ×
+resource-type × tenant-relation × ownership pattern it allows — and flags **broad** grants (those
+crossing a tenant boundary or reaching a non-owned resource) for tightening:
+
+```bash
+uv run permissiondiff mine --config permissiondiff.yaml
+```
+
+## Policy engines and agents
+
+Wrap an external policy engine as the authorizer with the adapter toolkit in
+`permissiondiff.adapters` (`from_boolean`, `from_decision`, or `http_authorizer` for OPA-style
+endpoints); runnable example adapters for OPA, OpenFGA, Auth0 FGA, Cedar, and SpiceDB live under
+[`examples/adapters/`](https://github.com/abishekgiri/permissiondiff/tree/main/examples/adapters).
+Adapters make read-only decision calls — point them at a non-production policy instance.
+
+For agent / on-behalf-of principals, declare `delegated_by: [id, ...]` on a subject. PermissionDiff
+enforces the least-privilege intersection rule: a delegated principal allowed where any delegator
+is denied (on the identical case) is a critical privilege-escalation finding.
+
 ## Baseline and diff workflow
 
 Create a baseline on trusted code:
@@ -145,6 +167,13 @@ The snapshot stores every exact input case, its baseline decision, a stable fing
 ```bash
 uv run permissiondiff diff --config permissiondiff.yaml \
   --baseline .permissiondiff/main.json
+```
+
+Or skip the snapshot file entirely and diff against a git ref — PermissionDiff evaluates the
+baseline authorizer as it existed at that ref in a temporary, auto-removed worktree:
+
+```bash
+uv run permissiondiff diff --config permissiondiff.yaml --git-ref main
 ```
 
 Classification is exhaustive:
@@ -187,7 +216,7 @@ The repository's thin composite action invokes the same CLI without duplicating 
 ```
 
 Check out the calling repository before this step and make sure the baseline is present in CI.
-Use `@v0.1.1` to pin the latest release; `@v0` follows compatible v0 releases. The
+Use `@v0.2.0` to pin the latest release; `@v0` follows compatible v0 releases. The
 [published-consumer smoke test](https://github.com/abishekgiri/permissiondiff/blob/main/.github/workflows/published-smoke.yml)
 exercises the PyPI package and the remote action in a fresh workspace without a source checkout.
 
