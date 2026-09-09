@@ -22,8 +22,8 @@ jobs:
       - name: Install from PyPI in an empty consumer project
         run: |
           uv init --bare --vcs none --name permissiondiff-consumer --python 3.12
-          uv add permissiondiff==0.1.1
-          uv run python -c 'import importlib.metadata as m; assert m.version("permissiondiff") == "0.1.1"; assert m.distribution("permissiondiff").read_text("direct_url.json") is None'
+          uv add permissiondiff==0.2.0
+          uv run python -c 'import importlib.metadata as m; assert m.version("permissiondiff") == "0.2.0"; assert m.distribution("permissiondiff").read_text("direct_url.json") is None'
           uv run permissiondiff --help
           uv run python -m permissiondiff --help
           uv run permissiondiff init
