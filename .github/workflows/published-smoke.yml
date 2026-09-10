@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 10
     steps:
       # Intentionally no checkout: consume the released package and remote action only.
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
       - name: Install from PyPI in an empty consumer project
